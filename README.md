@@ -4,10 +4,6 @@
 
 Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
 
-Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
-
-[Read my in-depth article on how I use Ralph](https://x.com/ryancarson/status/2008548371712135632)
-
 ## Prerequisites
 
 - One of the following AI coding tools installed and authenticated:
@@ -72,18 +68,6 @@ Available skills after installation:
 Skills are automatically invoked when you ask Claude to:
 - "create a prd", "write prd for", "plan this feature"
 - "convert this prd", "turn into ralph format", "create prd.json"
-
-### Configure Amp auto-handoff (recommended)
-
-Add to `~/.config/amp/settings.json`:
-
-```json
-{
-  "amp.experimental.autoHandoff": { "context": 90 }
-}
-```
-
-This enables automatic handoff when context fills up, allowing Ralph to handle large stories that exceed a single context window.
 
 ## Workflow
 
@@ -231,9 +215,3 @@ After copying `prompt.md` (for Amp) or `CLAUDE.md` (for Claude Code) to your pro
 ## Archiving
 
 Ralph automatically archives previous runs when you start a new feature (different `branchName`). Archives are saved to `archive/YYYY-MM-DD-feature-name/`.
-
-## References
-
-- [Geoffrey Huntley's Ralph article](https://ghuntley.com/ralph/)
-- [Amp documentation](https://ampcode.com/manual)
-- [Claude Code documentation](https://docs.anthropic.com/en/docs/claude-code)
