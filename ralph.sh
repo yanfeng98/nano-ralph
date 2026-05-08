@@ -1,11 +1,11 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [--tool amp|claude] [max_iterations]
+# Usage: ./ralph.sh [--tool opencode|claude] [max_iterations]
 
 set -e
 
 # Parse arguments
-TOOL="amp"  # Default to amp for backwards compatibility
+TOOL="opencode"  # Default to opencode for backwards compatibility
 MAX_ITERATIONS=10
 
 while [[ $# -gt 0 ]]; do
@@ -29,10 +29,17 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate tool choice
-if [[ "$TOOL" != "amp" && "$TOOL" != "claude" ]]; then
-  echo "Error: Invalid tool '$TOOL'. Must be 'amp' or 'claude'."
+if [[ "$TOOL" != "opencode" && "$TOOL" != "claude" ]]; then
+  echo "Error: Invalid tool '$TOOL'. Must be 'opencode' or 'claude'."
   exit 1
 fi
+
+# Set opencode permissions via environment variable
+if [ "$TOOL" = "opencode" ]; then
+  export OPENCODE_PERMISSION='{"*": "allow"}'
+  export OPENCODE_DISABLE_AUTOCOMPACT=true
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PRD_FILE="$SCRIPT_DIR/prd.json"
 PROGRESS_FILE="$SCRIPT_DIR/progress.txt"
@@ -88,8 +95,9 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   echo "==============================================================="
 
   # Run the selected tool with the ralph prompt
-  if [[ "$TOOL" == "amp" ]]; then
-    OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || true
+  if [[ "$TOOL" == "opencode" ]]; then
+    OPENCODE_MODEL=${MODEL:-opencode/big-pickle}
+    OUTPUT=$(cat "$SCRIPT_DIR/CLAUDE.md" | opencode run -m "$OPENCODE_MODEL" --agent build 2>&1 | tee /dev/stderr) || true
   else
     # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
     OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true

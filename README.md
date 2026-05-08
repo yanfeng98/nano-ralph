@@ -22,8 +22,8 @@ Copy the ralph files into your project:
 mkdir -p scripts/ralph
 cp /path/to/ralph/ralph.sh scripts/ralph/
 
-# Copy the prompt template for your AI tool of choice:
-cp /path/to/ralph/CLAUDE.md scripts/ralph/CLAUDE.md    # For Claude Code
+# Copy the prompt template for your AI tool:
+cp /path/to/ralph/prompt.md scripts/ralph/prompt.md
 
 chmod +x scripts/ralph/ralph.sh
 ```
@@ -92,7 +92,7 @@ Ralph will:
 | File | Purpose |
 |------|---------|
 | `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool claude`) |
-| `CLAUDE.md` | Prompt template for Claude Code |
+| `prompt.md` | Prompt template for Claude Code |
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
 | `progress.txt` | Append-only learnings for future iterations |
@@ -179,7 +179,7 @@ git log --oneline -10
 
 ## Customizing the Prompt
 
-After copying `CLAUDE.md` (for Claude Code) to your project, customize it for your project:
+After copying `prompt.md` (for Claude Code) to your project, customize it for your project:
 - Add project-specific quality check commands
 - Include codebase conventions
 - Add common gotchas for your stack
