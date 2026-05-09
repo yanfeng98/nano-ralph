@@ -5,8 +5,9 @@
 set -e
 
 # Parse arguments
-TOOL="opencode"  # Default to opencode for backwards compatibility
+TOOL="opencode"
 MAX_ITERATIONS=10
+MODEL="opencode/big-pickle"   # 新增默认值
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -18,8 +19,15 @@ while [[ $# -gt 0 ]]; do
       TOOL="${1#*=}"
       shift
       ;;
+    --model)               # 新增
+      MODEL="$2"
+      shift 2
+      ;;
+    --model=*)             # 新增（支持等号写法）
+      MODEL="${1#*=}"
+      shift
+      ;;
     *)
-      # Assume it's max_iterations if it's a number
       if [[ "$1" =~ ^[0-9]+$ ]]; then
         MAX_ITERATIONS="$1"
       fi
@@ -96,7 +104,7 @@ for i in $(seq 1 $MAX_ITERATIONS); do
 
   # Run the selected tool with the ralph prompt
   if [[ "$TOOL" == "opencode" ]]; then
-    OPENCODE_MODEL=${MODEL:-opencode/big-pickle}
+    OPENCODE_MODEL="${MODEL:-opencode/big-pickle}"   # 改为用 $MODEL，若空才用默认值
     OUTPUT=$(cat "$SCRIPT_DIR/CLAUDE.md" | opencode run -m "$OPENCODE_MODEL" --agent build 2>&1 | tee /dev/stderr) || true
   else
     # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
