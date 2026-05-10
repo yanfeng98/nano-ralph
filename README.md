@@ -171,32 +171,23 @@ cd .ralph/worktrees/<feature>-backend
 grep -E '"id"|"passes"' prd.json
 ```
 
-### Step 4: Merge (in Order)
+### Step 4: Merge (One Command)
 
-When a track completes, merge it. **Always merge backend/data tracks first**, then UI tracks:
-
-```
-Load the merge skill and merge ralph/<feature>-backend to main
-```
-
-After backend is merged, merge frontend:
+When all tracks are done (or as they finish), just say once:
 
 ```
-Load the merge skill and merge ralph/<feature>-frontend to main
+Load the merge skill and merge
 ```
 
-The `/merge` skill works from anywhere (main repo or worktree). It fetches latest main, shows a diff summary, asks for confirmation, and resolves conflicts.
+The skill automatically:
+1. Detects ALL pending `ralph/*` branches (e.g., `ralph/feature-backend`, `ralph/feature-frontend`)
+2. Shows a combined summary of every branch
+3. Determines the correct merge order (backend → frontend)
+4. Asks ONE confirmation for everything
+5. Merges each branch in order, resolving any conflicts
+6. Offers to push and clean up all worktrees at once
 
-### Step 5: Clean Up
-
-After merging each track, clean up its worktree:
-
-```bash
-git worktree remove .ralph/worktrees/<feature>-backend
-git worktree remove .ralph/worktrees/<feature>-frontend
-```
-
-Or let `/merge` offer to do it for you.
+No need to run it per-branch. One merge command handles everything.
 
 ### Parallel Flow Diagram
 
@@ -205,14 +196,15 @@ tasks/prd-feature.md
         │
         ▼ /ralph
   ┌─────────────────┐
-  │ prd-backend.json │──────► ralph.sh ──► .ralph/worktrees/<f>-backend/ ──► AI iterations
-  │ prd-frontend.json│──────► ralph.sh ──► .ralph/worktrees/<f>-frontend/ ─► AI iterations
-  └─────────────────┘
-        │                    (parallel)                    │
-        ▼                                                  ▼
-      /merge backend ───────────────────────────────► main
-                                                          │
-                                                        /merge frontend ──► main
+  │ prd-backend.json │──────► ralph.sh ──► .ralph/worktrees/<f>-backend/ ──► AI iterations ──┐
+  │ prd-frontend.json│──────► ralph.sh ──► .ralph/worktrees/<f>-frontend/ ─► AI iterations ──┤
+  └─────────────────┘         (parallel)                                                      │
+        │                                                                                     │
+        ▼                                                                                     ▼
+      /merge ──► detects ALL branches ──► merges backend first, then frontend ──► main
+                                                                                    │
+                                                                                    ▼
+                                                                            clean up all worktrees
 ```
 
 ## Key Files

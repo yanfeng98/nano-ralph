@@ -1,79 +1,74 @@
 ---
 name: merge
-description: "Review diff and merge a feature branch to main with AI-assisted conflict resolution. Use after Ralph completes. Works from worktree or main repo. Triggers on: merge this branch, merge to main, review and merge, merge feature, merge ralph branch."
+description: "Review diff and merge ALL completed Ralph feature branches to main with AI-assisted conflict resolution. Automatically detects parallel branches and merges them in the correct order (backend → frontend). Triggers on: merge this branch, merge to main, review and merge, merge feature, merge ralph branch, merge all, merge."
 user-invocable: true
 ---
 
 # Merge Reviewer
 
-Review changes on a feature branch, then merge it to main. If conflicts arise, resolve them intelligently. Works whether you are in a Ralph worktree or the main repository.
+Detect all completed Ralph branches, review changes, and merge them to main in the correct order. One command merges everything.
 
 ---
 
 ## The Job
 
-1. Detect current context (worktree vs main repo)
-2. Determine the feature branch
-3. Switch to main repo and checkout main
-4. Fetch latest and show change summary
-5. Optionally run icdiff for side-by-side review
-6. Confirm with user
-7. Merge to main -- resolve any conflicts
-8. Push (if user confirms)
-9. Offer to clean up the worktree
+1. Detect all pending Ralph branches (may be 1 or N from parallel tracks)
+2. Show a combined summary of all branches
+3. Determine the correct merge order
+4. Ask ONE confirmation for all
+5. Merge each branch in order, resolving conflicts
+6. Push (if user confirms)
+7. Clean up all associated worktrees
 
 ---
 
-## Step 0: Detect Context
+## Step 0: Detect All Pending Branches
 
-Check where you are:
+Find every Ralph branch that is ready to merge:
 
 ```bash
-pwd
-git worktree list
+# All ralph branches (not yet merged to main)
+git branch --list 'ralph/*' --no-merged main 2>/dev/null || git branch --list 'ralph/*'
+
+# All active Ralph worktrees
+git worktree list | grep '.ralph/worktrees/' || echo "No active worktrees"
+
+# Parallel PRD files (confirms this was a parallel run)
+ls scripts/ralph/prd-*.json 2>/dev/null || echo "No parallel PRDs"
 ```
 
-**If you are inside `.ralph/worktrees/<name>/`:**
+Also check `scripts/ralph/prd.json` for single-track runs.
 
-- You are in a Ralph worktree
-- Read `prd.json` from the current directory to get `branchName`
-- Also read `progress.txt` to summarize what was done
-- The **main repo** is the first entry in `git worktree list` (the one on `main` or `master`, or the bare repo)
-- You will switch to the main repo before merging
+From these, build the list of branches to merge. If there are multiple related branches (same feature, different tracks like `ralph/feature-backend`, `ralph/feature-frontend`), they are parallel tracks. Merge ALL of them.
 
-**If you are in the main repo (not a worktree path):**
-
-- `prd.json` may be at `scripts/ralph/prd.json` or in the current directory
-- The feature branch will come from `prd.json` `branchName` or `git branch --show-current`
-
-**Guard:** If currently on `main` or `master` branch and no `prd.json` with a different `branchName`, ask the user which feature branch to merge.
+If no branches are found, tell the user and exit.
 
 ---
 
-## Step 1: Determine Feature Branch
+## Step 1: Determine Merge Order
 
-1. If `prd.json` is found, extract `branchName`
-2. Otherwise, use `git branch --show-current` (only valid if in worktree)
-3. If neither yields a feature branch, ask the user
+**For a single branch:** just merge it.
 
-Note the worktree path if applicable:
+**For multiple parallel branches, sort by track type:**
 
-```bash
-# Does a worktree exist for this branch?
-git worktree list | grep "<feature-branch>" || true
-```
+| Track type | Merge order | Rationale |
+|------------|-------------|-----------|
+| `db`, `schema`, `migration` | 1st | Database changes needed by everything |
+| `backend`, `api`, `service` | 2nd | API/services needed by frontend |
+| `frontend`, `ui`, `web` | 3rd | UI consumes backend APIs |
+| `infra`, `ops`, `deploy` | Last | Infrastructure wraps everything |
+
+Detect the track type from the branch name suffix: `ralph/<feature>-<track>`.
+
+If unsure about order, ask the user.
 
 ---
 
 ## Step 2: Move to Main Repo
 
-**Critical:** You cannot merge while inside a worktree that's on the feature branch. Move to the main repo first.
-
 ```bash
-# Find main repo path (first worktree entry, or the git top-level)
+# Find main repo path
 MAIN_REPO=$(git worktree list | head -1 | awk '{print $1}')
-
-# If there's a worktree on main/master, use that. Otherwise use the main repo.
 MAIN_WORKTREE=$(git worktree list | grep -E '\[main\]|\[master\]' | head -1 | awk '{print $1}' || echo "")
 if [ -n "$MAIN_WORKTREE" ]; then
   cd "$MAIN_WORKTREE"
@@ -84,13 +79,15 @@ fi
 
 ---
 
-## Step 3: Fetch and Compare
+## Step 3: Show Combined Summary
+
+Fetch latest:
 
 ```bash
 git fetch origin main 2>/dev/null || git fetch origin master 2>/dev/null || true
 ```
 
-Determine target branch:
+Determine target:
 
 ```bash
 if git rev-parse --verify main >/dev/null 2>&1; then
@@ -103,17 +100,26 @@ else
 fi
 ```
 
-Show what will be merged:
+Present a combined summary of ALL branches:
 
-```bash
-git log --oneline $TARGET..<feature-branch>
+```
+=== Branches to merge (in order) ===
+
+1. ralph/task-priority-backend
+   Commits: 3    Files: +120 -5
+   Stories: US-001 (DB), US-002 (API) — both passing
+
+2. ralph/task-priority-frontend
+   Commits: 4    Files: +85 -12
+   Stories: US-003 (Badge), US-004 (Filter) — both passing
+
+Target: main
+Total: 7 commits across 2 branches
 ```
 
-```bash
-git diff --stat $TARGET..<feature-branch>
-```
+For each branch, show `git log --oneline $TARGET..<branch>` and `git diff --stat $TARGET..<branch>`.
 
-If `progress.txt` was found in Step 0, show a summary of what was done.
+If `progress.txt` exists in any worktree, include the story completion summary.
 
 ---
 
@@ -125,13 +131,12 @@ Check if icdiff is configured:
 command -v icdiff && git config --global difftool.icdiff.cmd
 ```
 
-**If configured:** Offer to run interactive diff review:
+**If configured:** Offer to run diff review for each branch:
 
 ```bash
-git difftool --tool=icdiff $TARGET..<feature-branch>
+# For each branch in order
+git difftool --tool=icdiff $TARGET..<branch>
 ```
-
-Tell the user: "Review each file. Press 'q' to exit the diff viewer."
 
 **If not configured:** Tell the user how to set it up:
 
@@ -142,136 +147,123 @@ git config --global difftool.prompt false
 git config --global diff.tool icdiff
 ```
 
-Then proceed without it.
+---
+
+## Step 5: Confirm (Once for All)
+
+Present a clean summary and ask ONCE:
+
+```
+Merge all N branches into <target> in this order?
+  1. ralph/<feature>-backend  (2 stories, 3 commits)
+  2. ralph/<feature>-frontend (2 stories, 4 commits)
+
+This will merge backend first, then frontend.
+```
+
+Wait for a single confirmation. Do NOT ask per-branch.
 
 ---
 
-## Step 5: Confirm
+## Step 6: Merge Each Branch in Order
 
-Present a clean summary:
-
-- Feature branch name
-- Target branch
-- List of commits (one line each)
-- Files changed count (+N -M)
-- Worktree location (if applicable)
-
-Ask: "Merge <feature-branch> into <target>?"
-
-Wait for explicit confirmation before proceeding. Do NOT merge without user approval.
-
----
-
-## Step 6: Merge
+For each branch in the determined order:
 
 ```bash
 git checkout $TARGET
-git merge <feature-branch> --no-ff
+git merge <branch> --no-ff -m "merge: <branch>
+
+Merging Ralph-generated feature branch into $TARGET."
 ```
 
-### If Conflicts Occur:
+After each merge, report: "Merged <branch> (N/N complete)"
+
+### If Conflicts Occur on Any Branch:
 
 1. Run `git diff --name-only --diff-filter=U` to list conflicted files
 2. Read each conflicted file and understand both sides
 3. Resolve conflicts intelligently:
    - Prefer the feature branch's intent (it's the new code)
-   - But do NOT blindly accept one side -- merge logically
+   - But do NOT blindly accept one side — merge logically
    - If a conflict is genuinely ambiguous, explain the choices and ask the user
 4. `git add` resolved files
 5. `git commit` to complete the merge
+6. Continue with the next branch
 
 **Important conflict resolution principles:**
-- Keep both additions when they are independent (e.g., new function + new import)
-- When both sides modify the same logic, prefer the feature branch but preserve any main-side refactors that don't conflict with the feature's intent
+- Keep both additions when they are independent
+- When both sides modify the same logic, prefer the feature branch but preserve any main-side refactors
 - Never silently drop code from either side
+- When merging frontend after backend: backend added the API, frontend uses it — these don't conflict
 
 ---
 
 ## Step 7: Push
 
-Ask: "Push <target> to origin?"
+After ALL branches are merged, ask once:
+
+"Push <target> to origin?"
 
 If yes: `git push origin $TARGET`
 
-Ask: "Delete remote feature branch origin/<feature-branch>?"
+Ask once for all remote branches:
 
-If yes: `git push origin --delete <feature-branch>`
+"Delete N remote branches: origin/<branch1>, origin/<branch2>?"
+
+If yes, delete each: `git push origin --delete <branch>`
 
 ---
 
-## Step 8: Clean Up Worktree
+## Step 8: Clean Up All Worktrees
 
-### Check for Other Parallel Worktrees
+List all worktrees that were merged:
 
-Before cleaning up, check if other worktrees are still active for related features:
+```
+All branches merged. Active Ralph worktrees:
+  .ralph/worktrees/<feature>-backend
+  .ralph/worktrees/<feature>-frontend
+
+Remove all? This runs git worktree remove for each.
+```
+
+If user confirms, remove each worktree:
 
 ```bash
-git worktree list
-ls .ralph/worktrees/ 2>/dev/null || echo "No worktrees"
-```
-
-If other worktrees exist (e.g., from parallel tracks), tell the user:
-```
-Other active worktrees:
-  .ralph/worktrees/<other-track> — branch <other-branch>
-
-These are for parallel tracks. Don't remove them if they're still in progress.
-```
-
-### Clean Up This Worktree
-
-If a worktree was found for the merged feature branch in Step 1:
-
-```
-The worktree for <feature-branch> is still at <path>.
-Remove it? This runs: git worktree remove <path>
-```
-
-If user confirms:
-
-```bash
-# Prune the local branch first if we're done with it
-git branch -d <feature-branch> 2>/dev/null || true
-
-# Remove worktree
+# For each worktree
 git worktree remove <path> --force 2>/dev/null || {
-  echo "Worktree has uncommitted changes. Remove manually:"
-  echo "  git worktree remove <path> --force"
+  echo "Warning: Could not remove <path> (may have uncommitted changes)"
 }
 ```
 
-If the worktree has uncommitted changes, warn the user before forcing removal.
+Also prune local branches:
 
-### Multiple Parallel Tracks: Merge Order
-
-If this was a parallel development with multiple tracks:
-
+```bash
+# Delete each merged feature branch locally
+git branch -d <branch1> <branch2> ... 2>/dev/null || true
 ```
-Parallel tracks detected. Recommended merge order:
-  1. Merge backend/data tracks first (schema + API changes)
-  2. Then merge frontend/UI tracks
 
-If you merge in the wrong order, later merges may have more conflicts.
-```
+If any worktree has uncommitted changes, warn before force-removing.
 
 ---
 
 ## Step 9: Summary
 
-Stay on `$TARGET` after merge.
+Stay on `$TARGET` after all merges.
 
 Summarize what was done:
-- Merged commits (count)
-- Any conflicts resolved (and how)
+- Number of branches merged
+- Total commits merged
+- Any conflicts resolved (and how, for each branch)
 - Whether pushed
-- Worktree status (removed or still present at path)
+- Worktrees cleaned up
 
 ---
 
 ## Hard Rules
 
-1. **Never merge without user confirmation.** Always present the summary first.
-2. **Never silently drop code** during conflict resolution.
-3. **Always fetch before merging** to avoid surprises.
-4. **Do NOT remove worktree without asking.**
-5. **If worktree has uncommitted changes, warn loudly** before force-removing.
+1. **Detect ALL branches automatically.** Don't ask "which branch?" unless nothing is found.
+2. **One confirmation for all.** Never ask per-branch.
+3. **Merge in dependency order.** Backend/data before frontend/UI.
+4. **Never silently drop code** during conflict resolution.
+5. **Clean up everything** — branches, worktrees — in one go.
+6. **If a branch has uncommitted changes, warn** before force-removing its worktree.
