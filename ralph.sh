@@ -114,8 +114,19 @@ if $USE_WORKTREE; then
   if [ -d "$WORKTREE_DIR" ]; then
     echo ""
     echo "Worktree already exists at: $WORKTREE_DIR"
-    echo "Resuming in existing worktree..."
+    echo "Resuming in existing worktree (preserving prd.json and progress.txt)..."
     echo "(Run 'git worktree remove $WORKTREE_DIR' to clean up)"
+
+    # Update prompt.md (always safe — AI instructions may have changed)
+    cp "$SCRIPT_DIR/prompt.md" "$WORKTREE_DIR/prompt.md"
+
+    # Initialize progress file only if it doesn't exist (never overwrite)
+    if [ ! -f "$WORKTREE_DIR/progress.txt" ]; then
+      echo "# Ralph Progress Log" > "$WORKTREE_DIR/progress.txt"
+      echo "Started: $(date)" >> "$WORKTREE_DIR/progress.txt"
+      echo "---" >> "$WORKTREE_DIR/progress.txt"
+    fi
+    # NOTE: prd.json is NOT overwritten — it contains runtime state (passes: true/false)
   else
     # Determine main branch
     MAIN_BRANCH="main"
@@ -150,19 +161,17 @@ if $USE_WORKTREE; then
     mkdir -p "$PROJECT_ROOT/.ralph/worktrees"
     git worktree add "$WORKTREE_DIR" "$BRANCH_NAME"
 
-    echo ""
-    echo "Worktree created successfully."
-  fi
+    # Copy ralph runtime files into new worktree
+    cp "$PRD_FILE" "$WORKTREE_DIR/prd.json"
+    cp "$SCRIPT_DIR/prompt.md" "$WORKTREE_DIR/prompt.md"
 
-  # Copy ralph runtime files into worktree
-  cp "$PRD_FILE" "$WORKTREE_DIR/prd.json"
-  cp "$SCRIPT_DIR/prompt.md" "$WORKTREE_DIR/prompt.md"
-
-  # Initialize progress file in worktree if not exists
-  if [ ! -f "$WORKTREE_DIR/progress.txt" ]; then
+    # Initialize progress file
     echo "# Ralph Progress Log" > "$WORKTREE_DIR/progress.txt"
     echo "Started: $(date)" >> "$WORKTREE_DIR/progress.txt"
     echo "---" >> "$WORKTREE_DIR/progress.txt"
+
+    echo ""
+    echo "Worktree created successfully."
   fi
 
   # Switch context to worktree

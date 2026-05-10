@@ -201,7 +201,26 @@ If yes: `git push origin --delete <feature-branch>`
 
 ## Step 8: Clean Up Worktree
 
-If a worktree was found for the feature branch in Step 1:
+### Check for Other Parallel Worktrees
+
+Before cleaning up, check if other worktrees are still active for related features:
+
+```bash
+git worktree list
+ls .ralph/worktrees/ 2>/dev/null || echo "No worktrees"
+```
+
+If other worktrees exist (e.g., from parallel tracks), tell the user:
+```
+Other active worktrees:
+  .ralph/worktrees/<other-track> — branch <other-branch>
+
+These are for parallel tracks. Don't remove them if they're still in progress.
+```
+
+### Clean Up This Worktree
+
+If a worktree was found for the merged feature branch in Step 1:
 
 ```
 The worktree for <feature-branch> is still at <path>.
@@ -214,7 +233,7 @@ If user confirms:
 # Prune the local branch first if we're done with it
 git branch -d <feature-branch> 2>/dev/null || true
 
-# Remove worktree (also removes the branch if it was the last ref)
+# Remove worktree
 git worktree remove <path> --force 2>/dev/null || {
   echo "Worktree has uncommitted changes. Remove manually:"
   echo "  git worktree remove <path> --force"
@@ -222,6 +241,18 @@ git worktree remove <path> --force 2>/dev/null || {
 ```
 
 If the worktree has uncommitted changes, warn the user before forcing removal.
+
+### Multiple Parallel Tracks: Merge Order
+
+If this was a parallel development with multiple tracks:
+
+```
+Parallel tracks detected. Recommended merge order:
+  1. Merge backend/data tracks first (schema + API changes)
+  2. Then merge frontend/UI tracks
+
+If you merge in the wrong order, later merges may have more conflicts.
+```
 
 ---
 

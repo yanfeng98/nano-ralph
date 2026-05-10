@@ -163,15 +163,22 @@ Frontend stories are NOT complete until visually verified. Ralph will use the de
 7. **No duplicate stories**: each story goes to exactly one track
 
 ### Single Track Output
-Write to `prd.json` in the ralph directory (scripts/ralph/).
+Write to `prd.json` in the ralph directory (where `ralph.sh` lives, typically `scripts/ralph/`).
 
 ### Parallel Track Output
-Write multiple files:
-- `prd-<track1>.json`
-- `prd-<track2>.json`
+Write multiple files to the SAME ralph directory:
+- `scripts/ralph/prd-<track1>.json`
+- `scripts/ralph/prd-<track2>.json`
 - ...
 
-Also write a `prd.json` (single-track version with ALL stories) as a fallback.
+Also write `scripts/ralph/prd.json` (all stories, no tracks) as a sequential fallback.
+
+The user runs each track with:
+```bash
+./scripts/ralph/ralph.sh --prd prd-<track>.json --tool claude
+```
+
+`ralph.sh` resolves relative `--prd` paths from its own directory, so `prd-backend.json` works from anywhere.
 
 ---
 

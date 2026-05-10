@@ -4,16 +4,18 @@ You are an autonomous coding agent working on a software project.
 
 ## Your Task
 
-1. Read the PRD at `prd.json` (in the same directory as this file)
+You are running inside a Ralph worktree — an isolated git checkout at `.ralph/worktrees/<name>/`. Your branch is already set. You only have the stories in `prd.json` (a subset if this is a parallel development track). Do NOT check out other branches or switch contexts.
+
+1. Read the PRD at `prd.json` (in the same directory as this file — the worktree root)
 2. Read the progress log at `progress.txt` (check Codebase Patterns section first)
-3. Verify you're on the correct branch: `git branch --show-current`. It should match the PRD `branchName`. If not, tell the user.
+3. Verify your branch: `git branch --show-current`. It should match the PRD `branchName`.
 4. Pick the **highest priority** user story where `passes: false`
 5. Implement that single user story
 6. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
 7. Update AGENTS.md files if you discover reusable patterns (see below)
-8. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
-9. Update the PRD to set `passes: true` for the completed story
-10. Append your progress to `progress.txt`
+8. Update the PRD (`prd.json`) to set `passes: true` for the completed story
+9. Append your progress to `progress.txt`
+10. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
 
 ## Progress Report Format
 
