@@ -1,56 +1,123 @@
 ---
 name: merge
-description: "Review diff and merge a feature branch to main with AI-assisted conflict resolution. Use after Ralph completes. Triggers on: merge this branch, merge to main, review and merge, merge feature, merge ralph branch."
+description: "Review diff and merge a feature branch to main with AI-assisted conflict resolution. Use after Ralph completes. Works from worktree or main repo. Triggers on: merge this branch, merge to main, review and merge, merge feature, merge ralph branch."
 user-invocable: true
 ---
 
 # Merge Reviewer
 
-Review changes on a feature branch, then merge it to main. If conflicts arise, resolve them intelligently.
+Review changes on a feature branch, then merge it to main. If conflicts arise, resolve them intelligently. Works whether you are in a Ralph worktree or the main repository.
 
 ---
 
 ## The Job
 
-1. Determine the feature branch (from `prd.json` `branchName` or current git branch)
-2. Fetch latest main
-3. Show what changed (commits + file stats)
-4. Optionally run `git difftool` with `icdiff` for side-by-side review
-5. Confirm with user
-6. Merge to main -- resolve any conflicts
-7. Push (if user confirms)
+1. Detect current context (worktree vs main repo)
+2. Determine the feature branch
+3. Switch to main repo and checkout main
+4. Fetch latest and show change summary
+5. Optionally run icdiff for side-by-side review
+6. Confirm with user
+7. Merge to main -- resolve any conflicts
+8. Push (if user confirms)
+9. Offer to clean up the worktree
+
+---
+
+## Step 0: Detect Context
+
+Check where you are:
+
+```bash
+pwd
+git worktree list
+```
+
+**If you are inside `.ralph/worktrees/<name>/`:**
+
+- You are in a Ralph worktree
+- Read `prd.json` from the current directory to get `branchName`
+- Also read `progress.txt` to summarize what was done
+- The **main repo** is the first entry in `git worktree list` (the one on `main` or `master`, or the bare repo)
+- You will switch to the main repo before merging
+
+**If you are in the main repo (not a worktree path):**
+
+- `prd.json` may be at `scripts/ralph/prd.json` or in the current directory
+- The feature branch will come from `prd.json` `branchName` or `git branch --show-current`
+
+**Guard:** If currently on `main` or `master` branch and no `prd.json` with a different `branchName`, ask the user which feature branch to merge.
 
 ---
 
 ## Step 1: Determine Feature Branch
 
-Read `prd.json` if it exists and extract `branchName`. Otherwise use `git branch --show-current`.
+1. If `prd.json` is found, extract `branchName`
+2. Otherwise, use `git branch --show-current` (only valid if in worktree)
+3. If neither yields a feature branch, ask the user
 
-Checkout the feature branch if not already on it.
+Note the worktree path if applicable:
 
-**Guard:** If on `main` or `master`, abort and tell the user to switch to the feature branch first.
+```bash
+# Does a worktree exist for this branch?
+git worktree list | grep "<feature-branch>" || true
+```
 
 ---
 
-## Step 2: Fetch and Compare
+## Step 2: Move to Main Repo
+
+**Critical:** You cannot merge while inside a worktree that's on the feature branch. Move to the main repo first.
+
+```bash
+# Find main repo path (first worktree entry, or the git top-level)
+MAIN_REPO=$(git worktree list | head -1 | awk '{print $1}')
+
+# If there's a worktree on main/master, use that. Otherwise use the main repo.
+MAIN_WORKTREE=$(git worktree list | grep -E '\[main\]|\[master\]' | head -1 | awk '{print $1}' || echo "")
+if [ -n "$MAIN_WORKTREE" ]; then
+  cd "$MAIN_WORKTREE"
+else
+  cd "$MAIN_REPO"
+fi
+```
+
+---
+
+## Step 3: Fetch and Compare
 
 ```bash
 git fetch origin main 2>/dev/null || git fetch origin master 2>/dev/null || true
 ```
 
-Show a summary of what will be merged:
+Determine target branch:
 
 ```bash
-git log --oneline origin/main..HEAD 2>/dev/null || git log --oneline main..HEAD
+if git rev-parse --verify main >/dev/null 2>&1; then
+  TARGET="main"
+elif git rev-parse --verify master >/dev/null 2>&1; then
+  TARGET="master"
+else
+  echo "Error: Neither main nor master found"
+  exit 1
+fi
+```
+
+Show what will be merged:
+
+```bash
+git log --oneline $TARGET..<feature-branch>
 ```
 
 ```bash
-git diff --stat origin/main..HEAD 2>/dev/null || git diff --stat main..HEAD
+git diff --stat $TARGET..<feature-branch>
 ```
+
+If `progress.txt` was found in Step 0, show a summary of what was done.
 
 ---
 
-## Step 3: Diff Review (Optional icdiff)
+## Step 4: Diff Review (Optional icdiff)
 
 Check if icdiff is configured:
 
@@ -61,7 +128,7 @@ command -v icdiff && git config --global difftool.icdiff.cmd
 **If configured:** Offer to run interactive diff review:
 
 ```bash
-git difftool --tool=icdiff origin/main..HEAD
+git difftool --tool=icdiff $TARGET..<feature-branch>
 ```
 
 Tell the user: "Review each file. Press 'q' to exit the diff viewer."
@@ -79,26 +146,27 @@ Then proceed without it.
 
 ---
 
-## Step 4: Confirm
+## Step 5: Confirm
 
 Present a clean summary:
 
 - Feature branch name
-- Target branch (main/master)
+- Target branch
 - List of commits (one line each)
-- Files changed count
+- Files changed count (+N -M)
+- Worktree location (if applicable)
 
-Ask: "Merge [branch] into main?"
+Ask: "Merge <feature-branch> into <target>?"
 
 Wait for explicit confirmation before proceeding. Do NOT merge without user approval.
 
 ---
 
-## Step 5: Merge
+## Step 6: Merge
 
 ```bash
-git checkout main
-git merge [feature-branch] --no-ff
+git checkout $TARGET
+git merge <feature-branch> --no-ff
 ```
 
 ### If Conflicts Occur:
@@ -119,23 +187,60 @@ git merge [feature-branch] --no-ff
 
 ---
 
-## Step 6: Push
+## Step 7: Push
 
-Ask: "Push main to origin?"
+Ask: "Push <target> to origin?"
 
-If yes: `git push origin main`
+If yes: `git push origin $TARGET`
 
-Ask: "Delete remote feature branch origin/[branch]?"
+Ask: "Delete remote feature branch origin/<feature-branch>?"
 
-If yes: `git push origin --delete [branch]`
+If yes: `git push origin --delete <feature-branch>`
 
 ---
 
-## Step 7: Clean Up
+## Step 8: Clean Up Worktree
 
-Stay on `main` after merge.
+If a worktree was found for the feature branch in Step 1:
+
+```
+The worktree for <feature-branch> is still at <path>.
+Remove it? This runs: git worktree remove <path>
+```
+
+If user confirms:
+
+```bash
+# Prune the local branch first if we're done with it
+git branch -d <feature-branch> 2>/dev/null || true
+
+# Remove worktree (also removes the branch if it was the last ref)
+git worktree remove <path> --force 2>/dev/null || {
+  echo "Worktree has uncommitted changes. Remove manually:"
+  echo "  git worktree remove <path> --force"
+}
+```
+
+If the worktree has uncommitted changes, warn the user before forcing removal.
+
+---
+
+## Step 9: Summary
+
+Stay on `$TARGET` after merge.
 
 Summarize what was done:
-- Merged commits
+- Merged commits (count)
 - Any conflicts resolved (and how)
 - Whether pushed
+- Worktree status (removed or still present at path)
+
+---
+
+## Hard Rules
+
+1. **Never merge without user confirmation.** Always present the summary first.
+2. **Never silently drop code** during conflict resolution.
+3. **Always fetch before merging** to avoid surprises.
+4. **Do NOT remove worktree without asking.**
+5. **If worktree has uncommitted changes, warn loudly** before force-removing.
