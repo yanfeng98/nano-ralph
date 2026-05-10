@@ -78,27 +78,62 @@ This creates `prd.json` with user stories structured for autonomous execution.
 
 ```bash
 # Using Claude Code
-./scripts/ralph/ralph.sh --tool claude [max_iterations]
+./scripts/ralph/ralph.sh --tool claude
+
+# Using OpenCode with specific model
+./scripts/ralph/ralph.sh --tool opencode --model opencode/big-pickle
+
+# Custom max iterations
+./scripts/ralph/ralph.sh --tool claude 20
+
+# Use specific PRD file (for parallel development)
+./scripts/ralph/ralph.sh --tool claude --prd prd-backend.json
 ```
 
-Default is 10 iterations. Use `--tool claude` to select your AI coding tool.
+Default is 10 iterations.
 
 Ralph will:
-1. Create a feature branch (from PRD `branchName`)
-2. Pick the highest priority story where `passes: false`
-3. Implement that single story
-4. Run quality checks (typecheck, tests)
-5. Commit if checks pass
-6. Update `prd.json` to mark story as `passes: true`
-7. Append learnings to `progress.txt`
-8. Repeat until all stories pass or max iterations reached
-9. Use `/merge` skill to review and merge to main
+1. Create an isolated git worktree at `.ralph/worktrees/<name>/` (from PRD `branchName`)
+2. Copy `prd.json` and `prompt.md` into the worktree
+3. Pick the highest priority story where `passes: false`
+4. Implement that single story
+5. Run quality checks (typecheck, tests)
+6. Commit if checks pass
+7. Update `prd.json` to mark story as `passes: true`
+8. Append learnings to `progress.txt`
+9. Repeat until all stories pass or max iterations reached
+10. Use `/merge` skill to review and merge to main
+
+### Parallel Development (Worktrees)
+
+Ralph uses git worktrees by default, so you can run **multiple instances in parallel**:
+
+```bash
+# Split your PRD into independent parts
+# prd-backend.json contains US-001, US-002
+# prd-frontend.json contains US-003, US-004
+
+# Terminal 1: Claude Code handles backend stories
+./scripts/ralph/ralph.sh --prd prd-backend.json --tool claude
+
+# Terminal 2: OpenCode handles frontend stories (same time!)
+./scripts/ralph/ralph.sh --prd prd-frontend.json --tool opencode
+```
+
+Each instance gets its own isolated worktree under `.ralph/worktrees/`. They work on different branches and never conflict.
+
+**Run without worktree** (legacy mode, uses current directory directly):
+
+```bash
+./scripts/ralph/ralph.sh --no-worktree --tool claude
+```
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool claude`) |
+| `ralph.sh` | The bash loop that spawns fresh AI instances in isolated worktrees |
+| `.ralph/worktrees/` | Git worktrees created by Ralph (one per feature branch) |
 | `prompt.md` | Prompt template for Claude Code |
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
@@ -184,17 +219,35 @@ cat progress.txt
 
 # Check git history
 git log --oneline -10
+
+# List active worktrees
+git worktree list
 ```
+
+**Worktree tips:**
+
+- Each worktree is at `.ralph/worktrees/<feature-name>/`
+- `cd .ralph/worktrees/<name>` to inspect changes manually
+- `git worktree remove .ralph/worktrees/<name>` to clean up
+- `git worktree list` shows all active worktrees
 
 ## Merging
 
-After Ralph completes, use the `/merge` skill to review and merge:
+After Ralph completes in a worktree, review and merge:
+
+1. Changes are in `.ralph/worktrees/<name>/` on the feature branch
+2. Use the `/merge` skill to review diff and merge to main
+3. After merge, clean up: `git worktree remove .ralph/worktrees/<name>/`
 
 ```
 Load the merge skill and merge this branch to main
 ```
 
-The skill will:
+```
+Load the merge skill and merge this branch to main
+```
+
+The skill works from any directory (main repo or worktree) and will:
 1. Determine the feature branch from `prd.json` or git
 2. Fetch latest main and show a change summary
 3. Optionally launch `icdiff` for side-by-side diff review
