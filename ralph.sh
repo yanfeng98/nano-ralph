@@ -105,10 +105,10 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   # Run the selected tool with the ralph prompt
   if [[ "$TOOL" == "opencode" ]]; then
     OPENCODE_MODEL="${MODEL:-opencode/big-pickle}"   # 改为用 $MODEL，若空才用默认值
-    OUTPUT=$(cat "$SCRIPT_DIR/CLAUDE.md" | opencode run -m "$OPENCODE_MODEL" --agent build 2>&1 | tee /dev/stderr) || true
+    OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | opencode run -m "$OPENCODE_MODEL" --agent build 2>&1 | tee /dev/stderr) || true
   else
     # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
-    OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
+    OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/prompt.md" 2>&1 | tee /dev/stderr) || true
   fi
   
   # Check for completion signal

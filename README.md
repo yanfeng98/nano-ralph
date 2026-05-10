@@ -96,8 +96,8 @@ Ralph will:
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
 | `progress.txt` | Append-only learnings for future iterations |
-| `skills/prd/` | Skill for generating PRDs (works with Amp and Claude Code) |
-| `skills/ralph/` | Skill for converting PRDs to JSON (works with Amp and Claude Code) |
+| `skills/prd/` | Skill for generating PRDs (works with OpenCode and Claude Code) |
+| `skills/ralph/` | Skill for converting PRDs to JSON (works with OpenCode and Claude Code) |
 | `flowchart/` | Interactive visualization of how Ralph works |
 
 ## Flowchart
