@@ -8,7 +8,7 @@ Ralph is an autonomous AI agent loop that runs AI coding tools ([Claude Code](ht
 
 - One of the following AI coding tools installed and authenticated:
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)
-- `jq` installed (`brew install jq` on macOS)
+  - [OpenCode](https://opencode.ai/) (`npm i -g opencode-ai`)
 - A git repository for your project
 
 ## Setup
@@ -168,7 +168,7 @@ Check current state:
 
 ```bash
 # See which stories are done
-cat prd.json | jq '.userStories[] | {id, title, passes}'
+grep -E '"id"|"title"|"passes"' prd.json
 
 # See learnings from previous iterations
 cat progress.txt
