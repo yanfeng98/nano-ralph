@@ -73,6 +73,9 @@ This creates `prd.json` with user stories structured for autonomous execution.
 ```bash
 # Using Claude Code
 ./scripts/ralph/ralph.sh --tool claude [max_iterations]
+
+# Auto-merge to main after completion
+./scripts/ralph/ralph.sh --tool claude --merge
 ```
 
 Default is 10 iterations. Use `--tool claude` to select your AI coding tool.
@@ -86,12 +89,14 @@ Ralph will:
 6. Update `prd.json` to mark story as `passes: true`
 7. Append learnings to `progress.txt`
 8. Repeat until all stories pass or max iterations reached
+9. Optionally review diff and merge to main (`--merge` flag or `ralph-merge.sh`)
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
 | `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool claude`) |
+| `ralph-merge.sh` | Review diff and merge completed feature branch to main |
 | `prompt.md` | Prompt template for Claude Code |
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
@@ -176,6 +181,31 @@ cat progress.txt
 # Check git history
 git log --oneline -10
 ```
+
+## Merging
+
+After Ralph completes, review and merge your feature branch:
+
+```bash
+# Manual merge review (any time)
+./scripts/ralph/ralph-merge.sh
+
+# Or run Ralph with auto-merge prompt
+./scripts/ralph/ralph.sh --tool claude --merge
+```
+
+### Side-by-side diff with icdiff (optional)
+
+Install `icdiff` for a colorful side-by-side diff experience during merge review:
+
+```bash
+pip install icdiff
+git config --global difftool.icdiff.cmd 'icdiff --line-numbers --no-bold "$LOCAL" "$REMOTE"'
+git config --global difftool.prompt false
+git config --global diff.tool icdiff
+```
+
+When `icdiff` is configured, `ralph-merge.sh` will automatically launch `git difftool` for interactive review. Without it, the script falls back to `git diff --stat` and `git log`.
 
 ## Customizing the Prompt
 
