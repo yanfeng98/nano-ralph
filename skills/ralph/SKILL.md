@@ -12,34 +12,61 @@ Converts existing PRDs to the prd.json format that Ralph uses for autonomous exe
 
 ## The Job
 
-Take a PRD (markdown file or text) and convert it to `prd.json` in your ralph directory.
+Take a PRD (markdown file or text) and convert it to `prd.json` file(s) in your ralph directory.
+
+**If the PRD has parallel tracks** (stories annotated with `[track: ...]`), generate one `prd-<track>.json` per track, each with a distinct `branchName`. Otherwise generate a single `prd.json`.
 
 ---
 
 ## Output Format
+
+### Single Track (no `[track: ...]` annotations)
 
 ```json
 {
   "project": "[Project Name]",
   "branchName": "ralph/[feature-name-kebab-case]",
   "description": "[Feature description from PRD title/intro]",
+  "userStories": [...]
+}
+```
+
+Save as: `prd.json`
+
+### Parallel Tracks (stories have `[track: ...]` annotations)
+
+Generate one file per track:
+
+**`prd-backend.json`:**
+```json
+{
+  "project": "[Project Name]",
+  "branchName": "ralph/[feature-name]-backend",
+  "description": "[Feature description] - Backend track",
   "userStories": [
-    {
-      "id": "US-001",
-      "title": "[Story title]",
-      "description": "As a [user], I want [feature] so that [benefit]",
-      "acceptanceCriteria": [
-        "Criterion 1",
-        "Criterion 2",
-        "Typecheck passes"
-      ],
-      "priority": 1,
-      "passes": false,
-      "notes": ""
-    }
+    // Only stories with [track: backend]
   ]
 }
 ```
+
+**`prd-frontend.json`:**
+```json
+{
+  "project": "[Project Name]",
+  "branchName": "ralph/[feature-name]-frontend",
+  "description": "[Feature description] - Frontend track",
+  "userStories": [
+    // Only stories with [track: frontend]
+  ]
+}
+```
+
+**Rules for parallel PRDs:**
+- Each track gets its own branch: `ralph/<feature>-<trackname>`
+- Story IDs keep their original numbering (US-001, US-002, etc.)
+- Priority resets to sequential within each track (1, 2, 3...)
+- Each file is self-contained and can run independently
+- Tell the user the run order: which tracks must merge first (e.g., "merge backend before frontend")
 
 ---
 
@@ -118,12 +145,33 @@ Frontend stories are NOT complete until visually verified. Ralph will use the de
 
 ## Conversion Rules
 
+### Single Track
 1. **Each user story becomes one JSON entry**
 2. **IDs**: Sequential (US-001, US-002, etc.)
 3. **Priority**: Based on dependency order, then document order
 4. **All stories**: `passes: false` and empty `notes`
 5. **branchName**: Derive from feature name, kebab-case, prefixed with `ralph/`
 6. **Always add**: "Typecheck passes" to every story's acceptance criteria
+
+### Parallel Tracks
+1. **Detect tracks**: Look for `[track: <name>]` in story titles
+2. **Group stories** by track name
+3. **Re-number priority** within each track (starting from 1)
+4. **Keep original IDs** (US-001 stays US-001 even if it's #1 in its track)
+5. **branchName**: `ralph/<feature>-<trackname>` per file
+6. **One file per track**: `prd-<trackname>.json`
+7. **No duplicate stories**: each story goes to exactly one track
+
+### Single Track Output
+Write to `prd.json` in the ralph directory (scripts/ralph/).
+
+### Parallel Track Output
+Write multiple files:
+- `prd-<track1>.json`
+- `prd-<track2>.json`
+- ...
+
+Also write a `prd.json` (single-track version with ALL stories) as a fallback.
 
 ---
 
@@ -146,7 +194,7 @@ Each is one focused change that can be completed and verified independently.
 
 ---
 
-## Example
+## Example: Single Track
 
 **Input PRD:**
 ```markdown
@@ -194,33 +242,51 @@ Add ability to mark tasks with different statuses.
       "priority": 2,
       "passes": false,
       "notes": ""
-    },
+    }
+  ]
+}
+```
+
+## Example: Parallel Tracks
+
+**Input PRD:**
+```markdown
+### US-001: Add status field to tasks table `[track: backend]`
+### US-002: Create status update API `[track: backend]`
+### US-003: Display status badge on task cards `[track: frontend]`
+### US-004: Add status filter dropdown `[track: frontend]`
+```
+
+**Output prd-backend.json:**
+```json
+{
+  "project": "TaskApp",
+  "branchName": "ralph/task-status-backend",
+  "description": "Task Status Feature - Backend track (API + database)",
+  "userStories": [
     {
-      "id": "US-003",
-      "title": "Add status toggle to task list rows",
-      "description": "As a user, I want to change task status directly from the list.",
+      "id": "US-001",
+      "title": "Add status field to tasks table",
+      "description": "As a developer, I need to store task status in the database.",
       "acceptanceCriteria": [
-        "Each row has status dropdown or toggle",
-        "Changing status saves immediately",
-        "UI updates without page refresh",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Add status column: 'pending' | 'in_progress' | 'done' (default 'pending')",
+        "Generate and run migration successfully",
+        "Typecheck passes"
       ],
-      "priority": 3,
+      "priority": 1,
       "passes": false,
       "notes": ""
     },
     {
-      "id": "US-004",
-      "title": "Filter tasks by status",
-      "description": "As a user, I want to filter the list to see only certain statuses.",
+      "id": "US-002",
+      "title": "Create status update API",
+      "description": "As a developer, I need an API to update task status.",
       "acceptanceCriteria": [
-        "Filter dropdown: All | Pending | In Progress | Done",
-        "Filter persists in URL params",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "PUT /api/tasks/:id/status accepts valid status values",
+        "Returns updated task on success",
+        "Typecheck passes"
       ],
-      "priority": 4,
+      "priority": 2,
       "passes": false,
       "notes": ""
     }
@@ -228,31 +294,91 @@ Add ability to mark tasks with different statuses.
 }
 ```
 
+**Output prd-frontend.json:**
+```json
+{
+  "project": "TaskApp",
+  "branchName": "ralph/task-status-frontend",
+  "description": "Task Status Feature - Frontend track (UI components)",
+  "userStories": [
+    {
+      "id": "US-003",
+      "title": "Display status badge on task cards",
+      "description": "As a user, I want to see task status at a glance.",
+      "acceptanceCriteria": [
+        "Each task card shows colored status badge",
+        "Badge colors: gray=pending, blue=in_progress, green=done",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Add status filter dropdown",
+      "description": "As a user, I want to filter the list to see only certain statuses.",
+      "acceptanceCriteria": [
+        "Filter dropdown: All | Pending | In Progress | Done",
+        "Filter persists in URL params",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
+```
+
+**How to run:**
+```bash
+# Start both in parallel
+./scripts/ralph/ralph.sh --prd prd-backend.json --tool claude
+./scripts/ralph/ralph.sh --prd prd-frontend.json --tool opencode
+
+# After backend completes, merge it first (frontend may depend on API)
+# Then merge frontend
+```
+
 ---
 
 ## Archiving Previous Runs
 
-**Before writing a new prd.json, check if there is an existing one from a different feature:**
+Ralph now uses git worktrees (isolated directories under `.ralph/worktrees/`). Each parallel PRD gets its own worktree.
 
-1. Read the current `prd.json` if it exists
-2. Check if `branchName` differs from the new feature's branch name
-3. If different AND `progress.txt` has content beyond the header:
+**Before writing new prd.json files, check for existing runs:**
+
+1. Read current `prd*.json` files if they exist
+2. Check `git worktree list` for active worktrees
+3. If `branchName` differs from the new feature:
    - Create archive folder: `archive/YYYY-MM-DD-feature-name/`
-   - Copy current `prd.json` and `progress.txt` to archive
-   - Reset `progress.txt` with fresh header
+   - Copy old `prd*.json` and `progress.txt` to archive
+   - Warn user about active worktrees that need cleanup
 
-**The ralph.sh script handles this automatically** when you run it, but if you are manually updating prd.json between runs, archive first.
+**The ralph.sh script handles archiving automatically** when you run it.
 
 ---
 
 ## Checklist Before Saving
 
-Before writing prd.json, verify:
+Before writing prd.json file(s), verify:
 
-- [ ] **Previous run archived** (if prd.json exists with different branchName, archive it first)
+- [ ] **Previous run archived** (check for existing prd*.json + active worktrees)
 - [ ] Each story is completable in one iteration (small enough)
 - [ ] Stories are ordered by dependency (schema to backend to UI)
 - [ ] Every story has "Typecheck passes" as criterion
 - [ ] UI stories have "Verify in browser using dev-browser skill" as criterion
 - [ ] Acceptance criteria are verifiable (not vague)
 - [ ] No story depends on a later story
+
+**If parallel tracks:**
+
+- [ ] Each story is tagged with exactly ONE `[track: ...]` annotation
+- [ ] No cross-track dependencies (track A story doesn't depend on track B)
+- [ ] Each track's branchName is unique: `ralph/<feature>-<trackname>`
+- [ ] One `prd-<track>.json` file per track
+- [ ] User knows the merge order (which track merges first)
+- [ ] Also generated a combined `prd.json` as fallback

@@ -28,7 +28,20 @@ Ask only critical questions where the initial prompt is ambiguous. Focus on:
 - **Problem/Goal:** What problem does this solve?
 - **Core Functionality:** What are the key actions?
 - **Scope/Boundaries:** What should it NOT do?
+- **Parallel Development:** Can stories be split into independent tracks for parallel AI execution?
 - **Success Criteria:** How do we know it's done?
+
+Always include this question for features with 3+ stories:
+
+```
+N. Can stories be developed in parallel?
+   A. No, they all depend on each other (single branch)
+   B. Yes, can split into backend + frontend tracks
+   C. Yes, I'll specify my own tracks
+   D. Yes, split by story groups (give me suggestions)
+```
+
+If the user chooses B/C/D, each story gets a `track` annotation for the `/ralph` skill to generate separate `prd.json` files.
 
 ### Format Questions Like This:
 
@@ -69,12 +82,13 @@ Specific, measurable objectives (bullet list).
 ### 3. User Stories
 Each story needs:
 - **Title:** Short descriptive name
+- **Track:** (if parallel) `backend`, `frontend`, or custom track name
 - **Description:** "As a [user], I want [feature] so that [benefit]"
 - **Acceptance Criteria:** Verifiable checklist of what "done" means
 
 Each story should be small enough to implement in one focused session.
 
-**Format:**
+**Format (single track, no parallel):**
 ```markdown
 ### US-001: [Title]
 **Description:** As a [user], I want [feature] so that [benefit].
@@ -84,6 +98,16 @@ Each story should be small enough to implement in one focused session.
 - [ ] Another criterion
 - [ ] Typecheck/lint passes
 - [ ] **[UI stories only]** Verify in browser using dev-browser skill
+```
+
+**Format (parallel tracks):**
+```markdown
+### US-001: [Title] `[track: backend]`
+**Description:** As a [user], I want [feature] so that [benefit].
+
+**Acceptance Criteria:**
+- [ ] Specific verifiable criterion
+- [ ] Typecheck/lint passes
 ```
 
 **Important:** 
@@ -117,6 +141,50 @@ How will success be measured?
 
 ### 9. Open Questions
 Remaining questions or areas needing clarification.
+
+---
+
+## Parallel Development Tracks
+
+If the user chose parallel development, annotate each story with a track tag. The `/ralph` skill will generate separate `prd.json` files per track, and `ralph.sh` runs them in isolated worktrees.
+
+### Track Rules
+
+1. **Stories within a track MUST be sequential** (US-001 before US-002)
+2. **Stories across different tracks MUST be independent** (no cross-track dependencies)
+3. **Schema changes go first** within a track, then backend logic, then UI
+4. **Track names** should be short: `backend`, `frontend`, `api`, `ui`, `db`, `infra`, etc.
+
+### Example: Split by Backend/Frontend
+
+```markdown
+### US-001: Add priority field to database `[track: backend]`
+...
+
+### US-002: Create priority API endpoint `[track: backend]`
+...
+
+### US-003: Display priority badge on task cards `[track: frontend]`
+...
+
+### US-004: Add priority filter dropdown `[track: frontend]`
+```
+
+This produces:
+- `prd-backend.json` → branch `ralph/task-priority-backend` (US-001, US-002)
+- `prd-frontend.json` → branch `ralph/task-priority-frontend` (US-003, US-004)
+
+The user then runs them in parallel:
+```bash
+./ralph.sh --prd prd-backend.json --tool claude &
+./ralph.sh --prd prd-frontend.json --tool opencode &
+```
+
+### Important
+
+- A story can only belong to ONE track
+- If you can't cleanly split, it's better to use a single track than force a bad split
+- Tell the user if certain stories must be merged in order (e.g., "merge backend first, then frontend")
 
 ---
 
@@ -233,8 +301,10 @@ Add priority levels to tasks so users can focus on what matters most. Tasks can 
 
 Before saving the PRD:
 
-- [ ] Asked clarifying questions with lettered options
+- [ ] Asked clarifying questions with lettered options (including parallel development)
 - [ ] Incorporated user's answers
+- [ ] If parallel: each story has a `[track: ...]` annotation
+- [ ] If parallel: no cross-track dependencies between stories
 - [ ] User stories are small and specific
 - [ ] Functional requirements are numbered and unambiguous
 - [ ] Non-goals section defines clear boundaries
