@@ -52,80 +52,167 @@ Skills are automatically invoked when you ask Claude to:
 - "merge this branch", "merge to main", "review and merge"
 - "init git", "initialize repo", "setup git for this project"
 
-## Workflow
+## Architecture
+
+Ralph has two parts that live in different places:
+
+| What | Where | Purpose |
+|------|-------|---------|
+| `ralph.sh`, `prompt.md` | **Your project** at `scripts/ralph/` | The runtime engine and AI instructions |
+| `/prd`, `/ralph`, `/merge`, `/init` | **Claude config** at `~/.claude/skills/` | Skills that you invoke in Claude Code |
+
+The skills (`/prd`, `/ralph`) create `prd.json` files in `scripts/ralph/`. Then `ralph.sh` reads them and runs the AI loop in an isolated worktree. The `/merge` skill merges results back to main.
+
+### `.gitignore` Setup
+
+Ralph creates git worktrees under `.ralph/`. Ensure your `.gitignore` has:
+
+```gitignore
+# AI agent worktrees and config (generated at runtime)
+.ralph/
+.claude/
+```
+
+`prd.json` and `progress.txt` should NOT be in the root `.gitignore` — they need to be committed inside worktrees (the AI force-adds them). If you run `/init`, it handles this automatically.
+
+## Sequential Workflow (Single Feature)
 
 ### 1. Create a PRD
-
-Use the PRD skill to generate a detailed requirements document:
 
 ```
 Load the prd skill and create a PRD for [your feature description]
 ```
 
-Answer the clarifying questions. The skill saves output to `tasks/prd-[feature-name].md`.
+Answer the clarifying questions (choose "A. No parallel" for single-branch). The skill saves to `tasks/prd-[feature-name].md`.
 
-### 2. Convert PRD to Ralph format
-
-Use the Ralph skill to convert the markdown PRD to JSON:
+### 2. Convert to JSON
 
 ```
 Load the ralph skill and convert tasks/prd-[feature-name].md to prd.json
 ```
 
-This creates `prd.json` with user stories structured for autonomous execution.
+This creates `scripts/ralph/prd.json`.
 
 ### 3. Run Ralph
 
 ```bash
-# Using Claude Code
 ./scripts/ralph/ralph.sh --tool claude
-
-# Using OpenCode with specific model
-./scripts/ralph/ralph.sh --tool opencode --model opencode/big-pickle
-
-# Custom max iterations
-./scripts/ralph/ralph.sh --tool claude 20
-
-# Use specific PRD file (for parallel development)
-./scripts/ralph/ralph.sh --tool claude --prd prd-backend.json
 ```
 
-Default is 10 iterations.
+Ralph creates a worktree, runs iterations, and exits when all stories pass. Default: 10 max iterations.
 
-Ralph will:
-1. Create an isolated git worktree at `.ralph/worktrees/<name>/` (from PRD `branchName`)
-2. Copy `prd.json` and `prompt.md` into the worktree
-3. Pick the highest priority story where `passes: false`
-4. Implement that single story
-5. Run quality checks (typecheck, tests)
-6. Commit if checks pass
-7. Update `prd.json` to mark story as `passes: true`
-8. Append learnings to `progress.txt`
-9. Repeat until all stories pass or max iterations reached
-10. Use `/merge` skill to review and merge to main
+### 4. Merge
 
-### Parallel Development (Worktrees)
+```
+Load the merge skill and merge this branch to main
+```
 
-Ralph uses git worktrees by default, so you can run **multiple instances in parallel**:
+---
+
+## Parallel Development: Full Walkthrough
+
+This is the complete flow for running two AI instances simultaneously on independent story tracks.
+
+### Step 1: Create a Tracked PRD
+
+```
+Load the prd skill and create a PRD for [feature]
+```
+
+When asked about parallel development, choose **B** (backend + frontend) or **C** (custom tracks). The skill annotates each story with `[track: backend]` or `[track: frontend]`.
+
+Output: `tasks/prd-[feature-name].md`
+
+### Step 2: Convert to Parallel JSON Files
+
+```
+Load the ralph skill and convert tasks/prd-[feature-name].md
+```
+
+The skill detects the `[track: ...]` annotations and generates:
+
+```
+scripts/ralph/
+├── prd.json              # All stories (sequential fallback)
+├── prd-backend.json      # US-001, US-002 → branch: ralph/<feature>-backend
+├── prd-frontend.json     # US-003, US-004 → branch: ralph/<feature>-frontend
+└── ...
+```
+
+Each `prd-<track>.json` has its own `branchName` and only its track's stories.
+
+### Step 3: Run Both in Parallel
+
+Open two terminals in your project root:
 
 ```bash
-# Split your PRD into independent parts
-# prd-backend.json contains US-001, US-002
-# prd-frontend.json contains US-003, US-004
-
-# Terminal 1: Claude Code handles backend stories
+# Terminal 1: Claude Code handles backend
 ./scripts/ralph/ralph.sh --prd prd-backend.json --tool claude
 
-# Terminal 2: OpenCode handles frontend stories (same time!)
+# Terminal 2: OpenCode handles frontend (at the same time!)
 ./scripts/ralph/ralph.sh --prd prd-frontend.json --tool opencode
 ```
 
-Each instance gets its own isolated worktree under `.ralph/worktrees/`. They work on different branches and never conflict.
+What happens internally:
+1. Each `ralph.sh` reads its PRD file → extracts `branchName`
+2. Creates a git worktree: `.ralph/worktrees/<feature>-backend/` and `.ralph/worktrees/<feature>-frontend/`
+3. Copies `prd-<track>.json` → worktree as `prd.json` (the AI reads this)
+4. Copies `prompt.md` → worktree (AI instructions)
+5. AI runs in the worktree: implements stories, marks `passes: true`, commits via `git add -f`
+6. Each instance is fully isolated — different branches, different directories
 
-**Run without worktree** (legacy mode, uses current directory directly):
+You can check progress anytime:
 
 ```bash
-./scripts/ralph/ralph.sh --no-worktree --tool claude
+git worktree list
+# Shows both active worktrees
+
+cd .ralph/worktrees/<feature>-backend
+grep -E '"id"|"passes"' prd.json
+```
+
+### Step 4: Merge (in Order)
+
+When a track completes, merge it. **Always merge backend/data tracks first**, then UI tracks:
+
+```
+Load the merge skill and merge ralph/<feature>-backend to main
+```
+
+After backend is merged, merge frontend:
+
+```
+Load the merge skill and merge ralph/<feature>-frontend to main
+```
+
+The `/merge` skill works from anywhere (main repo or worktree). It fetches latest main, shows a diff summary, asks for confirmation, and resolves conflicts.
+
+### Step 5: Clean Up
+
+After merging each track, clean up its worktree:
+
+```bash
+git worktree remove .ralph/worktrees/<feature>-backend
+git worktree remove .ralph/worktrees/<feature>-frontend
+```
+
+Or let `/merge` offer to do it for you.
+
+### Parallel Flow Diagram
+
+```
+tasks/prd-feature.md
+        │
+        ▼ /ralph
+  ┌─────────────────┐
+  │ prd-backend.json │──────► ralph.sh ──► .ralph/worktrees/<f>-backend/ ──► AI iterations
+  │ prd-frontend.json│──────► ralph.sh ──► .ralph/worktrees/<f>-frontend/ ─► AI iterations
+  └─────────────────┘
+        │                    (parallel)                    │
+        ▼                                                  ▼
+      /merge backend ───────────────────────────────► main
+                                                          │
+                                                        /merge frontend ──► main
 ```
 
 ## Key Files
@@ -233,26 +320,24 @@ git worktree list
 
 ## Merging
 
-After Ralph completes in a worktree, review and merge:
-
-1. Changes are in `.ralph/worktrees/<name>/` on the feature branch
-2. Use the `/merge` skill to review diff and merge to main
-3. After merge, clean up: `git worktree remove .ralph/worktrees/<name>/`
+After Ralph completes, use `/merge` to review and integrate:
 
 ```
 Load the merge skill and merge this branch to main
 ```
 
-```
-Load the merge skill and merge this branch to main
-```
+The skill works from any directory (main repo or worktree):
+1. Detects the feature branch from `prd.json` or git context
+2. Fetches latest main and shows a change summary
+3. Optionally launches `icdiff` for side-by-side diff review
+4. Merges to main, **resolving conflicts automatically**
+5. Offers to push and clean up the worktree
 
-The skill works from any directory (main repo or worktree) and will:
-1. Determine the feature branch from `prd.json` or git
-2. Fetch latest main and show a change summary
-3. Optionally launch `icdiff` for side-by-side diff review
-4. Merge to main -- **resolving any conflicts automatically**
-5. Push to origin (with confirmation)
+After merge, manually clean up remaining worktrees:
+
+```bash
+git worktree remove .ralph/worktrees/<name>/
+```
 
 ### Side-by-side diff with icdiff (optional)
 

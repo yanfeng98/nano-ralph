@@ -15,7 +15,7 @@ You are running inside a Ralph worktree — an isolated git checkout at `.ralph/
 7. Update AGENTS.md files if you discover reusable patterns (see below)
 8. Update the PRD (`prd.json`) to set `passes: true` for the completed story
 9. Append your progress to `progress.txt`
-10. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
+10. If checks pass, commit ALL changes. Use `git add -f prd.json progress.txt` if these files are gitignored in the project — they MUST be committed in this worktree. Commit message: `feat: [Story ID] - [Story Title]`
 
 ## Progress Report Format
 

@@ -34,9 +34,16 @@ Ask these questions (with defaults):
    A. No remote (local only) ← default
    B. Yes, I'll provide the URL
 
-3. Any files you already know should be ignored?
+3. Will you use Ralph (autonomous AI agent loop) with this project?
+   A. No ← default
+   B. Yes, I plan to use Ralph
+   (If yes, Ralph-specific ignores will be scoped to scripts/ralph/)
+
+4. Any files you already know should be ignored?
    (e.g., large datasets, credentials, generated files)
 ```
+
+If the user chooses "Yes" for Ralph: later, after writing the main `.gitignore`, also create `scripts/ralph/.gitignore` (see Step 4).
 
 Do NOT proceed until the user answers.
 
@@ -121,14 +128,37 @@ desktop.ini
 \#*\#
 .\#*
 
-# Ralph working files (generated during runs)
+# AI agent worktrees and config (generated at runtime)
+.ralph/
+.claude/
+```
+
+### If user will use Ralph: create `scripts/ralph/.gitignore`
+
+**CRITICAL:** Do NOT add `prd.json` or `progress.txt` to the ROOT `.gitignore`. These files must be committed inside worktrees (`.ralph/worktrees/`). Instead, scope them to `scripts/ralph/` where the templates live:
+
+```bash
+mkdir -p scripts/ralph
+```
+
+Create `scripts/ralph/.gitignore`:
+```gitignore
+# Ralph working files (templates — not the worktree copies)
 prd.json
+prd-*.json
 progress.txt
 .last-branch
 archive/
+```
 
-# Claude Code
-.claude/
+Then tell the user:
+```
+Ralph setup:
+  scripts/ralph/.gitignore — scoped ignores for Ralph template files
+  .gitignore — ignores .ralph/ and .claude/ globally
+
+The worktree copies of prd.json and progress.txt WILL be committed
+to feature branches (they track story completion status).
 ```
 
 ### Python project adds:
