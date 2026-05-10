@@ -27,8 +27,17 @@ Detect all completed Ralph branches, review changes, and merge them to main in t
 Find every Ralph branch that is ready to merge:
 
 ```bash
-# All ralph branches (not yet merged to main)
-git branch --list 'ralph/*' --no-merged main 2>/dev/null || git branch --list 'ralph/*'
+# First determine target
+if git rev-parse --verify main >/dev/null 2>&1; then
+  TARGET="main"
+elif git rev-parse --verify master >/dev/null 2>&1; then
+  TARGET="master"
+else
+  echo "Error: Neither main nor master found"; exit 1
+fi
+
+# All ralph branches (not yet merged to target)
+git branch --list 'ralph/*' --no-merged $TARGET 2>/dev/null || git branch --list 'ralph/*'
 
 # All active Ralph worktrees
 git worktree list | grep '.ralph/worktrees/' || echo "No active worktrees"
@@ -60,7 +69,9 @@ If no branches are found, tell the user and exit.
 
 Detect the track type from the branch name suffix: `ralph/<feature>-<track>`.
 
-If unsure about order, ask the user.
+**If the track name doesn't match any known type** (e.g., `bug-101`, `module-x`, custom names): the branches are likely independent. Merge them in alphabetical order and tell the user: "These branches appear to be independent — merging in alphabetical order. Let me know if a different order is needed."
+
+Only ask the user about order if there's a clear dependency concern (e.g., one track is obviously a database change and another is UI).
 
 ---
 
@@ -84,20 +95,7 @@ fi
 Fetch latest:
 
 ```bash
-git fetch origin main 2>/dev/null || git fetch origin master 2>/dev/null || true
-```
-
-Determine target:
-
-```bash
-if git rev-parse --verify main >/dev/null 2>&1; then
-  TARGET="main"
-elif git rev-parse --verify master >/dev/null 2>&1; then
-  TARGET="master"
-else
-  echo "Error: Neither main nor master found"
-  exit 1
-fi
+git fetch origin $TARGET 2>/dev/null || true
 ```
 
 Present a combined summary of ALL branches:

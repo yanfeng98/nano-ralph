@@ -6,9 +6,9 @@
 set -e
 
 # Parse arguments
-TOOL="opencode"
+TOOL="claude"
 MAX_ITERATIONS=10
-MODEL="opencode/big-pickle"
+MODEL=""
 PRD_FILE=""
 USE_WORKTREE=true
 
@@ -276,6 +276,6 @@ echo "Check $PROGRESS_FILE for status."
 if $USE_WORKTREE; then
   echo ""
   echo "Worktree: $WORKTREE_DIR"
-  echo "Resume with: cd $WORKTREE_DIR && <run ralph again with --no-worktree>"
+  echo "Re-run ralph.sh to resume (existing worktree will be reused)"
 fi
 exit 1

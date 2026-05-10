@@ -96,7 +96,11 @@ This creates `scripts/ralph/prd.json`.
 ### 3. Run Ralph
 
 ```bash
-./scripts/ralph/ralph.sh --tool claude
+# Claude Code is the default
+./scripts/ralph/ralph.sh
+
+# Or explicitly choose your tool
+./scripts/ralph/ralph.sh --tool opencode --model opencode/big-pickle
 ```
 
 Ralph creates a worktree, runs iterations, and exits when all stories pass. Default: 10 max iterations.
@@ -146,8 +150,8 @@ Each `prd-<track>.json` has its own `branchName` and only its track's stories.
 Open two terminals in your project root:
 
 ```bash
-# Terminal 1: Claude Code handles backend
-./scripts/ralph/ralph.sh --prd prd-backend.json --tool claude
+# Terminal 1: Claude Code handles backend (claude is default)
+./scripts/ralph/ralph.sh --prd prd-backend.json
 
 # Terminal 2: OpenCode handles frontend (at the same time!)
 ./scripts/ralph/ralph.sh --prd prd-frontend.json --tool opencode
