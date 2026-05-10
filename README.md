@@ -37,17 +37,20 @@ For Claude Code (manual)
 cp -r skills/prd ~/.claude/skills/
 cp -r skills/ralph ~/.claude/skills/
 cp -r skills/merge ~/.claude/skills/
+cp -r skills/init ~/.claude/skills/
 ```
 
 Available skills after installation:
 - `/prd` - Generate Product Requirements Documents
 - `/ralph` - Convert PRDs to prd.json format
 - `/merge` - Review diff and merge feature branch to main
+- `/init` - Initialize a git repo with smart .gitignore generation
 
 Skills are automatically invoked when you ask Claude to:
 - "create a prd", "write prd for", "plan this feature"
 - "convert this prd", "turn into ralph format", "create prd.json"
 - "merge this branch", "merge to main", "review and merge"
+- "init git", "initialize repo", "setup git for this project"
 
 ## Workflow
 
@@ -103,6 +106,7 @@ Ralph will:
 | `skills/prd/` | Skill for generating PRDs (works with OpenCode and Claude Code) |
 | `skills/ralph/` | Skill for converting PRDs to JSON (works with OpenCode and Claude Code) |
 | `skills/merge/` | Skill for reviewing diff and merging to main with conflict resolution |
+| `skills/init/` | Skill for initializing git repo with smart .gitignore |
 | `flowchart/` | Interactive visualization of how Ralph works |
 
 ## Flowchart
