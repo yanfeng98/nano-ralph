@@ -36,15 +36,18 @@ For Claude Code (manual)
 ```bash
 cp -r skills/prd ~/.claude/skills/
 cp -r skills/ralph ~/.claude/skills/
+cp -r skills/merge ~/.claude/skills/
 ```
 
 Available skills after installation:
 - `/prd` - Generate Product Requirements Documents
 - `/ralph` - Convert PRDs to prd.json format
+- `/merge` - Review diff and merge feature branch to main
 
 Skills are automatically invoked when you ask Claude to:
 - "create a prd", "write prd for", "plan this feature"
 - "convert this prd", "turn into ralph format", "create prd.json"
+- "merge this branch", "merge to main", "review and merge"
 
 ## Workflow
 
@@ -73,9 +76,6 @@ This creates `prd.json` with user stories structured for autonomous execution.
 ```bash
 # Using Claude Code
 ./scripts/ralph/ralph.sh --tool claude [max_iterations]
-
-# Auto-merge to main after completion
-./scripts/ralph/ralph.sh --tool claude --merge
 ```
 
 Default is 10 iterations. Use `--tool claude` to select your AI coding tool.
@@ -89,20 +89,20 @@ Ralph will:
 6. Update `prd.json` to mark story as `passes: true`
 7. Append learnings to `progress.txt`
 8. Repeat until all stories pass or max iterations reached
-9. Optionally review diff and merge to main (`--merge` flag or `ralph-merge.sh`)
+9. Use `/merge` skill to review and merge to main
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
 | `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool claude`) |
-| `ralph-merge.sh` | Review diff and merge completed feature branch to main |
 | `prompt.md` | Prompt template for Claude Code |
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
 | `progress.txt` | Append-only learnings for future iterations |
 | `skills/prd/` | Skill for generating PRDs (works with OpenCode and Claude Code) |
 | `skills/ralph/` | Skill for converting PRDs to JSON (works with OpenCode and Claude Code) |
+| `skills/merge/` | Skill for reviewing diff and merging to main with conflict resolution |
 | `flowchart/` | Interactive visualization of how Ralph works |
 
 ## Flowchart
@@ -184,15 +184,18 @@ git log --oneline -10
 
 ## Merging
 
-After Ralph completes, review and merge your feature branch:
+After Ralph completes, use the `/merge` skill to review and merge:
 
-```bash
-# Manual merge review (any time)
-./scripts/ralph/ralph-merge.sh
-
-# Or run Ralph with auto-merge prompt
-./scripts/ralph/ralph.sh --tool claude --merge
 ```
+Load the merge skill and merge this branch to main
+```
+
+The skill will:
+1. Determine the feature branch from `prd.json` or git
+2. Fetch latest main and show a change summary
+3. Optionally launch `icdiff` for side-by-side diff review
+4. Merge to main -- **resolving any conflicts automatically**
+5. Push to origin (with confirmation)
 
 ### Side-by-side diff with icdiff (optional)
 
@@ -204,8 +207,6 @@ git config --global difftool.icdiff.cmd 'icdiff --line-numbers --no-bold "$LOCAL
 git config --global difftool.prompt false
 git config --global diff.tool icdiff
 ```
-
-When `icdiff` is configured, `ralph-merge.sh` will automatically launch `git difftool` for interactive review. Without it, the script falls back to `git diff --stat` and `git log`.
 
 ## Customizing the Prompt
 

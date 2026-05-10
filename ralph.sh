@@ -1,6 +1,6 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [--tool opencode|claude] [--model <model>] [--merge] [max_iterations]
+# Usage: ./ralph.sh [--tool opencode|claude] [--model <model>] [max_iterations]
 
 set -e
 
@@ -8,7 +8,6 @@ set -e
 TOOL="opencode"
 MAX_ITERATIONS=10
 MODEL="opencode/big-pickle"
-DO_MERGE=false   # 新增默认值
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -26,10 +25,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --model=*)             # 新增（支持等号写法）
       MODEL="${1#*=}"
-      shift
-      ;;
-    --merge)
-      DO_MERGE=true
       shift
       ;;
     *)
@@ -121,10 +116,6 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     echo ""
     echo "Ralph completed all tasks!"
     echo "Completed at iteration $i of $MAX_ITERATIONS"
-    if $DO_MERGE; then
-      echo ""
-      "$SCRIPT_DIR/ralph-merge.sh"
-    fi
     exit 0
   fi
   
