@@ -1,23 +1,35 @@
 ---
 name: prd
-description: "Generate a Product Requirements Document (PRD) for a new feature. Use when planning a feature, starting a new project, or when asked to create a PRD. Triggers on: create a prd, write prd for, plan this feature, requirements for, spec out."
+description: "Generate a Product Requirements Document (PRD) for features or bug-fix plans. Use for planning features, fixing bugs in batches, or any structured development task. Triggers on: create a prd, write prd for, plan this feature, requirements for, spec out, fix bugs, bug fix plan, create fix plan, batch fix."
 user-invocable: true
 ---
 
 # PRD Generator
 
-Create detailed Product Requirements Documents that are clear, actionable, and suitable for implementation.
+Create detailed Product Requirements Documents for features OR bug-fix plans. Each story can be a feature implementation or a bug fix — the format is the same, the intent differs.
 
 ---
 
 ## The Job
 
-1. Receive a feature description from the user
+1. Receive a description from the user (feature or bug list)
 2. Ask 3-5 essential clarifying questions (with lettered options)
 3. Generate a structured PRD based on answers
-4. Save to `tasks/prd-[feature-name].md`
+4. Save to `tasks/prd-[name].md`
 
 **Important:** Do NOT start implementing. Just create the PRD.
+
+### Feature vs Bug-Fix PRDs
+
+| Aspect | Feature PRD | Bug-Fix PRD |
+|--------|------------|-------------|
+| Story title | "Add priority field to database" | "Fix null pointer in login handler" |
+| Description | "As a user, I want X so that Y" | "Bug: X happens when Y. Expected Z." |
+| Acceptance criteria | "Button shows confirmation dialog" | "Bug no longer reproduces. Test X passes." |
+| Commit prefix | `feat:` | `fix:` |
+| Parallel tracks | backend / frontend | by component / file / bug ID |
+
+Everything else (story structure, priority, passes tracking) is identical.
 
 ---
 
@@ -31,17 +43,17 @@ Ask only critical questions where the initial prompt is ambiguous. Focus on:
 - **Parallel Development:** Can stories be split into independent tracks for parallel AI execution?
 - **Success Criteria:** How do we know it's done?
 
-Always include this question for features with 3+ stories:
+Always include this question when there are 3+ stories:
 
 ```
-N. Can stories be developed in parallel?
+N. Can these be worked on in parallel?
    A. No, they all depend on each other (single branch)
-   B. Yes, can split into backend + frontend tracks
-   C. Yes, I'll specify my own tracks
-   D. Yes, split by story groups (give me suggestions)
+   B. Yes, by component/module (e.g., backend + frontend for features, or by file for bugs)
+   C. Yes, each story independently (one branch per story)
+   D. Yes, I'll specify the grouping
 ```
 
-If the user chooses B/C/D, each story gets a `track` annotation for the `/ralph` skill to generate separate `prd.json` files.
+If the user chooses B/C/D, each story gets a `track` annotation. For features, tracks are typically `backend`/`frontend`. For bugs, tracks are typically `bug-<id>` or by affected component. The `/ralph` skill will generate separate `prd-<track>.json` files.
 
 ### Format Questions Like This:
 
@@ -293,6 +305,82 @@ Add priority levels to tasks so users can focus on what matters most. Tasks can 
 
 - Should priority affect task ordering within a column?
 - Should we add keyboard shortcuts for priority changes?
+```
+
+---
+
+## Example: Bug-Fix PRD (Batch of 3)
+
+```markdown
+# PRD: Bugfix Batch 1 — Login & Dashboard
+
+## Introduction
+
+Fix 3 bugs from the backlog: null pointer on login, dashboard chart rendering, and session timeout handling.
+
+## Goals
+
+- Fix login crash when email field is empty (Bug #101)
+- Fix dashboard chart showing wrong data on first load (Bug #102)
+- Fix session not redirecting to login after timeout (Bug #103)
+- All fixes pass existing tests + manual verification
+
+## User Stories
+
+### US-001: Fix null pointer in login handler `[track: bug-101]`
+**Description:** Bug #101: Login throws NullPointerException when email field is empty. Expected: show validation error.
+
+**Acceptance Criteria:**
+- [ ] Empty email shows validation message instead of crash
+- [ ] Existing login flow still works
+- [ ] Typecheck passes
+- [ ] Tests pass
+
+### US-002: Fix dashboard chart initial render `[track: bug-102]`
+**Description:** Bug #102: Dashboard chart shows empty data on first load. Data appears after manual refresh. Expected: data loads on initial render.
+
+**Acceptance Criteria:**
+- [ ] Chart renders with data on first load
+- [ ] No manual refresh needed
+- [ ] Typecheck passes
+- [ ] Verify in browser using dev-browser skill
+
+### US-003: Fix session timeout redirect `[track: bug-103]`
+**Description:** Bug #103: After session timeout, API returns 401 but UI stays on page. Expected: redirect to login.
+
+**Acceptance Criteria:**
+- [ ] 401 response triggers redirect to /login
+- [ ] Current page state is preserved in session storage
+- [ ] Typecheck passes
+- [ ] Tests pass
+
+## Functional Requirements
+
+- FR-1: Login form validates email before submission
+- FR-2: Dashboard fetches data on component mount
+- FR-3: HTTP interceptor redirects on 401
+
+## Non-Goals
+
+- Not refactoring the entire login module
+- Not redesigning the dashboard
+
+## Success Metrics
+
+- All 3 bugs no longer reproduce
+- No regression in existing test suite
+```
+
+**How to run (3 parallel fixes):**
+```bash
+/ralph → prd-bug-101.json, prd-bug-102.json, prd-bug-103.json
+
+./ralph.sh --prd prd-bug-101.json --tool claude &
+./ralph.sh --prd prd-bug-102.json --tool claude &
+./ralph.sh --prd prd-bug-103.json --tool opencode &
+
+# After all complete:
+/merge  → auto-detects all 3 branches, merges in order
 ```
 
 ---

@@ -10,12 +10,17 @@ You are running inside a Ralph worktree — an isolated git checkout at `.ralph/
 2. Read the progress log at `progress.txt` (check Codebase Patterns section first)
 3. Verify your branch: `git branch --show-current`. It should match the PRD `branchName`.
 4. Pick the **highest priority** user story where `passes: false`
-5. Implement that single user story
+5. Complete that single story:
+   - **Feature story:** Implement the feature
+   - **Bug-fix story:** Find the root cause and fix the bug
 6. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
-7. Update AGENTS.md files if you discover reusable patterns (see below)
-8. Update the PRD (`prd.json`) to set `passes: true` for the completed story
-9. Append your progress to `progress.txt`
-10. If checks pass, commit ALL changes. Use `git add -f prd.json progress.txt` if these files are gitignored in the project — they MUST be committed in this worktree. Commit message: `feat: [Story ID] - [Story Title]`
+7. **For bugs:** Verify the fix — reproduce the original bug scenario and confirm it no longer occurs
+8. Update AGENTS.md files if you discover reusable patterns (see below)
+9. Update the PRD (`prd.json`) to set `passes: true` for the completed story
+10. Append your progress to `progress.txt`
+11. If checks pass, commit ALL changes. Use `git add -f prd.json progress.txt` if needed. Commit message:
+    - Feature: `feat: [Story ID] - [Story Title]`
+    - Bugfix: `fix: [Story ID] - [Story Title]`
 
 ## Progress Report Format
 

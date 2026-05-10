@@ -207,6 +207,89 @@ tasks/prd-feature.md
                                                                             clean up all worktrees
 ```
 
+---
+
+## Bug Fixing: Batch Workflow
+
+Ralph handles bug fixing just like features. Process bugs in batches, running regression between batches.
+
+### Example: 20 bugs, 3 at a time
+
+```
+Bug backlog: #101 through #120
+
+Batch 1 (3 bugs)     Batch 2 (5 bugs)     Batch 3 (5 bugs)    ...until done
+    │                     │                     │
+    ▼                     ▼                     ▼
+  /prd → /ralph         /prd → /ralph         /prd → /ralph
+    │                     │                     │
+    ▼                     ▼                     ▼
+  ralph.sh × 3          ralph.sh × 5          ralph.sh × N
+  (parallel)            (parallel)            (parallel)
+    │                     │                     │
+    ▼                     ▼                     ▼
+  /merge                /merge                /merge
+    │                     │                     │
+    ▼                     ▼                     ▼
+  main ──► regression   main ──► regression    main → done!
+```
+
+### Batch 1 Walkthrough
+
+**1. Create bug-fix PRD:**
+
+```
+Load the prd skill and create a fix plan for bugs #101, #102, #103
+```
+
+The skill asks clarifying questions. Choose **C** (each bug independently) for parallel fixing. Output: `tasks/prd-bugfix-batch1.md`
+
+**2. Convert to JSON:**
+
+```
+Load the ralph skill and convert tasks/prd-bugfix-batch1.md
+```
+
+Generates `prd-bug-101.json`, `prd-bug-102.json`, `prd-bug-103.json` — one per bug, each with its own branch.
+
+**3. Run in parallel:**
+
+```bash
+./scripts/ralph/ralph.sh --prd prd-bug-101.json --tool claude &
+./scripts/ralph/ralph.sh --prd prd-bug-102.json --tool claude &
+./scripts/ralph/ralph.sh --prd prd-bug-103.json --tool opencode &
+```
+
+Three worktrees, three branches, three AI instances fixing bugs simultaneously.
+
+**4. Merge all at once:**
+
+```
+Load the merge skill and merge
+```
+
+Auto-detects all 3 `ralph/bugfix-batch1-*` branches, merges them in order.
+
+**5. Run regression:**
+
+```bash
+# User runs their test suite on main
+npm test
+# Or: pytest, cargo test, go test, etc.
+```
+
+**6. Next batch:** If regression passes, repeat with bugs #104-#108 (or however many remain). Each batch creates from the latest main (which now includes previous fixes).
+
+### Key Points for Bug Fixing
+
+- **One bug per story**: Each story describes the bug, steps to reproduce, and expected fix
+- **`fix:` commit prefix**: The AI uses `fix:` instead of `feat:` for bugfixes
+- **Bug verification**: AI verifies the bug no longer reproduces before committing
+- **Parallel by bug ID**: For independent bugs, use `[track: bug-<id>]` annotations
+- **Regression between batches**: Always run your test suite after each merge before starting the next batch
+
+---
+
 ## Key Files
 
 | File | Purpose |

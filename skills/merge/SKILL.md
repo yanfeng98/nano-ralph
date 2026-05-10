@@ -1,6 +1,6 @@
 ---
 name: merge
-description: "Review diff and merge ALL completed Ralph feature branches to main with AI-assisted conflict resolution. Automatically detects parallel branches and merges them in the correct order (backend → frontend). Triggers on: merge this branch, merge to main, review and merge, merge feature, merge ralph branch, merge all, merge."
+description: "Review diff and merge ALL completed Ralph branches to main with AI-assisted conflict resolution. Automatically detects parallel branches and merges them in the correct order. Triggers on: merge this branch, merge to main, review and merge, merge feature, merge ralph branch, merge all, merge, merge fixes."
 user-invocable: true
 ---
 
